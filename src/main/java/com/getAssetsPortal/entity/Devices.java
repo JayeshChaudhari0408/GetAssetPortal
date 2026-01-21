@@ -2,12 +2,16 @@ package com.getAssetsPortal.entity;
 
 import com.getAssetsPortal.entity.enums.Status;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Set;
 
 @Entity
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Devices {
 
     @Id
@@ -15,7 +19,8 @@ public class Devices {
     private Long id;
 
     private String IMEI;
-    private String Serial_no;
+    @Column(name = "serial_no")
+    private String serialNo;
     private String Brand;
     private Long Lot_Number;
     private String MAC_ID;
