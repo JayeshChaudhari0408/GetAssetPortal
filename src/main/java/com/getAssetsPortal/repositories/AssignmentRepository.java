@@ -7,5 +7,4 @@ import java.util.Optional;
 
 public interface AssignmentRepository extends JpaRepository<DeviceAssignment,Long> {
     Optional<DeviceAssignment> findByDevices_IdAndDeallocatedOnIsNull(Long deviceId);
-
 }
