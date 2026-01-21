@@ -15,4 +15,8 @@ public interface DeviceRepository extends JpaRepository<Devices,Long> {
     """)
     Optional<Devices> findBySerialNoIgnoreCase(@Param("serialNo") String serialNo);
 
+    Optional<Devices> findBySerialNo(String serialNo);
+    Optional<Devices> findByImei(String imei);
+
+
 }

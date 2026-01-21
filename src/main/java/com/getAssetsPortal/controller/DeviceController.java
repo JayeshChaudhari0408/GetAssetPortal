@@ -1,5 +1,6 @@
 package com.getAssetsPortal.controller;
 
+import com.getAssetsPortal.dto.DeviceHistoryResponse;
 import com.getAssetsPortal.dto.DeviceSwapDto;
 import com.getAssetsPortal.services.DeviceService;
 import lombok.RequiredArgsConstructor;
@@ -18,5 +19,13 @@ public class DeviceController {
         deviceService.swapDevice(request);
         return ResponseEntity.ok("Assets swapped successfully");
     }
+
+    @GetMapping("/history")
+    public ResponseEntity<DeviceHistoryResponse> history(
+            @RequestParam String value) {
+
+        return ResponseEntity.ok(deviceService.getDeviceHistory(value));
+    }
+
 
 }

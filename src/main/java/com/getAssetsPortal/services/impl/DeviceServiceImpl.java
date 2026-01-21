@@ -1,5 +1,7 @@
 package com.getAssetsPortal.services.impl;
 
+import com.getAssetsPortal.dto.DeviceHistoryResponse;
+import com.getAssetsPortal.dto.DeviceHistoryRowDto;
 import com.getAssetsPortal.dto.DeviceSwapDto;
 import com.getAssetsPortal.entity.DeviceAssignment;
 import com.getAssetsPortal.entity.Devices;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Service
@@ -23,6 +26,8 @@ public class DeviceServiceImpl implements DeviceService {
     private final AssignmentRepository assignmentRepository;
     private final UserRepository userRepository;
 
+
+    //SWAP
     private void swap(Devices device, Long newUserId, String remark) {
 
         DeviceAssignment current =
@@ -118,4 +123,38 @@ public class DeviceServiceImpl implements DeviceService {
 
         devices.setStatus(Status.ACTIVE);
     }
+
+
+    //HISTORY
+    public DeviceHistoryResponse getDeviceHistory(String value) {
+
+        Devices device = deviceRepository.findBySerialNo(value)
+                .or(() -> deviceRepository.findByImei(value))
+                .orElseThrow(() -> new RuntimeException("Device not found"));
+
+        List<DeviceAssignment> assignments =
+                assignmentRepository
+                        .findByDevices_IdOrderByAllocatedOnAsc(device.getId());
+
+        List<DeviceHistoryRowDto> history = assignments.stream()
+                .map(a -> {
+                    DeviceHistoryRowDto dto = new DeviceHistoryRowDto();
+                    dto.setUserName(a.getUsers().getEmployeeCode());
+                    dto.setFrom(a.getAllocatedOn());
+                    dto.setTo(a.getDeallocatedOn());
+                    dto.setCurrent(a.getDeallocatedOn() == null);
+                    return dto;
+                })
+                .toList();
+
+        DeviceHistoryResponse response = new DeviceHistoryResponse();
+        response.setSerialNo(device.getSerialNo());
+        response.setImei(device.getImei());
+        response.setModelName(device.getModel_name());
+        response.setStatus(device.getStatus());
+        response.setHistory(history);
+
+        return response;
+    }
+
 }

@@ -18,7 +18,8 @@ public class Devices {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String IMEI;
+    @Column(name = "imei")
+    private String imei;
     @Column(name = "serial_no")
     private String serialNo;
     private String Brand;
