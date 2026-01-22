@@ -1,9 +1,6 @@
 package com.getAssetsPortal.services.impl;
 
-import com.getAssetsPortal.dto.DeviceDetailsDto;
-import com.getAssetsPortal.dto.DeviceHistoryResponse;
-import com.getAssetsPortal.dto.DeviceHistoryRowDto;
-import com.getAssetsPortal.dto.DeviceSwapDto;
+import com.getAssetsPortal.dto.*;
 import com.getAssetsPortal.entity.DeviceAssignment;
 import com.getAssetsPortal.entity.Devices;
 import com.getAssetsPortal.entity.Users;
@@ -16,8 +13,12 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.apache.catalina.User;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -181,6 +182,125 @@ public class DeviceServiceImpl implements DeviceService {
         response.setHistory(history);
 
         return response;
+    }
+
+    @Override
+    public DeviceBulkSummaryDto processCSV(MultipartFile file) {
+
+        List<DeviceBulkRowResultDto> results = new ArrayList<>();
+        int success = 0;
+        int failure = 0;
+        int rowNumber = 1;
+
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(file.getInputStream()))) {
+
+            br.readLine(); // skip header
+
+            String line;
+            while ((line = br.readLine()) != null) {
+                DeviceBulkRowResultDto result = processRow(line, rowNumber++);
+                results.add(result);
+
+                if ("SUCCESS".equals(result.getStatus())) {
+                    success++;
+                } else {
+                    failure++;
+                }
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("CSV processing failed", e);
+        }
+
+        return DeviceBulkSummaryDto.builder()
+                .totalRows(results.size())
+                .successCount(success)
+                .failureCount(failure)
+                .results(results)
+                .build();
+    }
+
+    private DeviceBulkRowResultDto processRow(String line, int rowNumber) {
+
+        String[] data = line.split(",");
+
+        try {
+            if (data.length < 4) {
+                throw new RuntimeException("Mandatory fields missing");
+            }
+
+            String serialNo = data[0].trim();
+            String assignedTo = data[1].trim();
+            String usedBy = data[2].trim();
+            String deviceType = data[3].trim();
+
+            Devices device = deviceRepository.findBySerialNo(serialNo)
+                    .orElseThrow(() -> new RuntimeException("Device not found"));
+
+            Users assignedUser = userRepository.findByDomainId(assignedTo)
+                    .orElseThrow(() -> new RuntimeException("Assigned user not found"));
+
+            userRepository.findByDomainId(usedBy)
+                    .orElseThrow(() -> new RuntimeException("UsedBy user not found"));
+
+            if (!device.getDeviceType().equalsIgnoreCase(deviceType)) {
+                throw new RuntimeException("Device type mismatch");
+            }
+
+            if (device.getStatus() != Status.PULLED) {
+                throw new RuntimeException("Device not available");
+            }
+
+            // Assign device
+            device.setStatus(Status.ACTIVE);
+            device.setInstalledBy(assignedUser.getDomainId());
+            device.setInstallDate(LocalDateTime.now());
+
+            deviceRepository.save(device);
+
+            return buildResponse(device, rowNumber, "SUCCESS", null);
+
+        } catch (Exception ex) {
+            return DeviceBulkRowResultDto.builder()
+                    .rowNumber(rowNumber)
+                    .status("FAILED")
+                    .errorReason(ex.getMessage())
+                    .build();
+        }
+    }
+
+    private DeviceBulkRowResultDto buildResponse(
+            Devices d, int row, String status, String error) {
+
+        return DeviceBulkRowResultDto.builder()
+                .rowNumber(row)
+                .status(status)
+                .errorReason(error)
+                .id(d.getId())
+                .imei(d.getImei())
+                .serialNo(d.getSerialNo())
+                .brand(d.getBrand())
+                .lotNumber(d.getLotNumber())
+                .macId(d.getMacId())
+                .assetCode(d.getAssetCode())
+                .hostName(d.getHostName())
+                .deviceStatus(d.getStatus())
+                .configuration(d.getConfiguration())
+                .assetControlledBy(d.getAssetControlledBy())
+                .deviceType(d.getDeviceType())
+                .deviceSubType(d.getDeviceSubType())
+                .purchaseOrderNumber(d.getPurchaseOrderNumber())
+                .warrantyMonths(d.getWarrantyMonths())
+                .warrantyExpiry(d.getWarrantyExpiry())
+                .installedBy(d.getInstalledBy())
+                .installDate(d.getInstallDate())
+                .pulledBy(d.getPulledBy())
+                .pulledDate(d.getPulledDate())
+                .assetCso(d.getAssetCso())
+                .remark(d.getRemark())
+                .modelName(d.getModelName())
+                .build();
     }
 
 }

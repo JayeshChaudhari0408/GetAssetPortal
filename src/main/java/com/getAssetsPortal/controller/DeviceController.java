@@ -1,11 +1,13 @@
 package com.getAssetsPortal.controller;
 
+import com.getAssetsPortal.dto.DeviceBulkSummaryDto;
 import com.getAssetsPortal.dto.DeviceHistoryResponse;
 import com.getAssetsPortal.dto.DeviceSwapDto;
 import com.getAssetsPortal.services.DeviceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/devices")
@@ -25,6 +27,13 @@ public class DeviceController {
             @RequestParam String value) {
 
         return ResponseEntity.ok(deviceService.getDeviceHistory(value));
+    }
+
+    @PostMapping(value = "/bulk", consumes = "multipart/form-data")
+    public ResponseEntity<DeviceBulkSummaryDto> bulkUpload(
+            @RequestParam("file") MultipartFile file) {
+
+        return ResponseEntity.ok(deviceService.processCSV(file));
     }
 
 
