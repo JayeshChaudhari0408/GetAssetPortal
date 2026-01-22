@@ -1,5 +1,6 @@
 package com.getAssetsPortal.services.impl;
 
+import com.getAssetsPortal.dto.DeviceDetailsDto;
 import com.getAssetsPortal.dto.DeviceHistoryResponse;
 import com.getAssetsPortal.dto.DeviceHistoryRowDto;
 import com.getAssetsPortal.dto.DeviceSwapDto;
@@ -13,10 +14,12 @@ import com.getAssetsPortal.repositories.UserRepository;
 import com.getAssetsPortal.services.DeviceService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.apache.catalina.User;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
@@ -128,30 +131,55 @@ public class DeviceServiceImpl implements DeviceService {
     //HISTORY
     public DeviceHistoryResponse getDeviceHistory(String value) {
 
-        Devices device = deviceRepository.findBySerialNo(value)
+        Devices device = deviceRepository.findBySerialNoIgnoreCase(value)
                 .or(() -> deviceRepository.findByImei(value))
                 .orElseThrow(() -> new RuntimeException("Device not found"));
 
+        Optional<DeviceAssignment> activeAssignment =
+                assignmentRepository.findByDevices_IdAndDeallocatedOnIsNull(device.getId());
+
         List<DeviceAssignment> assignments =
-                assignmentRepository
-                        .findByDevices_IdOrderByAllocatedOnAsc(device.getId());
+                assignmentRepository.findByDevices_IdOrderByAllocatedOnAsc(device.getId());
+
+        DeviceDetailsDto deviceDto = new DeviceDetailsDto();
+        deviceDto.setSerialNo(device.getSerialNo());
+        deviceDto.setLotNumber(device.getLotNumber());
+        deviceDto.setImei(device.getImei());
+        deviceDto.setMacId(device.getMacId());
+        deviceDto.setAssetCode(device.getAssetCode());
+        deviceDto.setHostName(device.getHostName());
+        deviceDto.setConfiguration(device.getConfiguration());
+        deviceDto.setStatus(device.getStatus());
+        deviceDto.setAssetControlledBy(device.getAssetControlledBy());
+        deviceDto.setDeviceType(device.getDeviceType());
+        deviceDto.setDeviceSubType(device.getDeviceSubType());
+        deviceDto.setPurchaseOrderNumber(device.getPurchaseOrderNumber());
+        deviceDto.setWarrantyMonths(device.getWarrantyMonths());
+        deviceDto.setWarrantyExpiry(device.getWarrantyExpiry());
+        deviceDto.setInstalledBy(device.getInstalledBy());
+        deviceDto.setInstallDate(device.getInstallDate());
+        deviceDto.setPulledBy(device.getPulledBy());
+        deviceDto.setPulledDate(device.getPulledDate());
+        deviceDto.setAssetCso(device.getAssetCso());
+
+        activeAssignment.ifPresent(a ->
+                deviceDto.setAssignedTo(a.getUsers().getEmployeeCode())
+        );
 
         List<DeviceHistoryRowDto> history = assignments.stream()
                 .map(a -> {
-                    DeviceHistoryRowDto dto = new DeviceHistoryRowDto();
-                    dto.setUserName(a.getUsers().getEmployeeCode());
-                    dto.setFrom(a.getAllocatedOn());
-                    dto.setTo(a.getDeallocatedOn());
-                    dto.setCurrent(a.getDeallocatedOn() == null);
-                    return dto;
+                    DeviceHistoryRowDto h = new DeviceHistoryRowDto();
+                    h.setDomainId(a.getUsers().getDomainId());
+                    h.setEmployeeCode(a.getUsers().getEmployeeCode());
+                    h.setAssignedOn(a.getAllocatedOn());
+                    h.setUnassignedOn(a.getDeallocatedOn());
+                    h.setAssignedBy(a.getUsedBy());
+                    return h;
                 })
                 .toList();
 
         DeviceHistoryResponse response = new DeviceHistoryResponse();
-        response.setSerialNo(device.getSerialNo());
-        response.setImei(device.getImei());
-        response.setModelName(device.getModel_name());
-        response.setStatus(device.getStatus());
+        response.setDeviceDetails(deviceDto);
         response.setHistory(history);
 
         return response;

@@ -20,28 +20,61 @@ public class Devices {
 
     @Column(name = "imei")
     private String imei;
+
     @Column(name = "serial_no")
     private String serialNo;
-    private String Brand;
-    private Long Lot_Number;
-    private String MAC_ID;
-    private String Asset_Code;
-    private String Host_Name;
+
+    private String brand;
+
+    @Column(name = "lot_number")
+    private Long lotNumber;
+
+    @Column(name = "mac_id")
+    private String macId;
+
+    @Column(name = "asset_code")
+    private String assetCode;
+
+    @Column(name = "host_name")
+    private String hostName;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Status status;
-    private String Configuration;
-    private String Asset_Controlled_By;
-    private String Device_Type;
-    private String Device_Sub_Type;
-    private String Purchase_Order_Number;
-    private Long Warranty_months;
-    private LocalDateTime Warranty_Expiry;
-    private String Installed_By;
-    private LocalDateTime Install_Date;
-    private String Pulled_By;
-    private LocalDateTime Pulled_Date;
-    private String Asset_CSO;
-    private String Remark;
-    private String Model_name;
+
+    private String configuration;
+
+    @Column(name = "asset_controlled_by")
+    private String assetControlledBy;
+
+    @Column(name = "device_type")
+    private String deviceType;
+
+    @Column(name = "device_sub_type")
+    private String deviceSubType;
+
+    @Column(name = "purchase_order_number")
+    private String purchaseOrderNumber;
+
+    @Column(name = "warranty_months")
+    private Long warrantyMonths;
+
+    @Column(name = "warranty_expiry")
+    private LocalDateTime warrantyExpiry;
+
+    @Column(name = "installed_by")
+    private String installedBy;
+
+    @Column(name = "install_date")
+    private LocalDateTime installDate;
+
+    @Column(name = "pulled_by")
+    private String pulledBy;
+
+    @Column(name = "pulled_date")
+    private LocalDateTime pulledDate;
+
+    @Column(name = "asset_cso")
+    private String assetCso;
+
+    private String modelName;
 }

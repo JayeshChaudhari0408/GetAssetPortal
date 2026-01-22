@@ -14,10 +14,6 @@ import java.util.List;
 @AllArgsConstructor
 public class DeviceHistoryResponse {
 
-    private String serialNo;
-    private String imei;
-    private String modelName;
-    private Status status;
-
+    private DeviceDetailsDto deviceDetails;
     private List<DeviceHistoryRowDto> history;
 }

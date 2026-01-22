@@ -13,9 +13,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class DeviceHistoryRowDto {
 
-    private String userName;
-    private LocalDateTime from;
-    private LocalDateTime to;
-    private boolean current;
+    private String domainId;
+    private String employeeCode;
+
+    private LocalDateTime assignedOn;
+    private LocalDateTime unassignedOn;
+    private String assignedBy;
 }
 

@@ -2,6 +2,7 @@ package com.getAssetsPortal.services.impl;
 
 import com.getAssetsPortal.dto.UserAssetDto;
 import com.getAssetsPortal.entity.DeviceAssignment;
+import com.getAssetsPortal.entity.Devices;
 import com.getAssetsPortal.entity.Users;
 import com.getAssetsPortal.repositories.AssignmentRepository;
 import com.getAssetsPortal.repositories.DeviceRepository;
@@ -32,12 +33,38 @@ public class UserServiceImpl implements UserService {
 
         return assignments.stream()
                 .map(a -> {
+                    Devices d = a.getDevices();
                     UserAssetDto dto = new UserAssetDto();
-                    dto.setSerialNo(a.getDevices().getSerialNo());
-                    dto.setImei(a.getDevices().getImei());
-                    dto.setModelName(a.getDevices().getModel_name());
-                    dto.setStatus(a.getDevices().getStatus());
-                    dto.setAllocatedOn(a.getAllocatedOn());
+                    dto.setDomainId(user.getDomainId());
+                    dto.setEmployeeCode(user.getEmployeeCode());
+
+                    dto.setRemark(a.getUsedBy());
+
+                    dto.setAssignedDate(a.getAllocatedOn());
+                    dto.setAssignedBy("IT ADMIN"); // or future field
+
+                    dto.setAssetControlledBy(d.getAssetControlledBy());
+
+                    dto.setDeviceType(d.getDeviceType());
+                    dto.setDeviceSubType(d.getDeviceSubType());
+
+                    dto.setBrand(d.getBrand());
+                    dto.setModel(d.getModelName());
+
+                    dto.setSerialNumber(d.getSerialNo());
+                    dto.setHostName(d.getHostName());
+
+                    dto.setAssignedTo(user.getEmployeeCode());
+
+                    dto.setUsedBy(a.getUsedBy());
+
+                    dto.setImei(d.getImei());
+                    dto.setMacId(d.getMacId());
+
+                    dto.setInstalledDate(d.getInstallDate());
+
+                    dto.setAssetCertification(null);   // not in DB
+                    dto.setFilesUploaded(null);        // not in DB
                     return dto;
                 })
                 .toList();
