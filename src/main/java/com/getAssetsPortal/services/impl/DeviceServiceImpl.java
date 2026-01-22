@@ -30,18 +30,27 @@ public class DeviceServiceImpl implements DeviceService {
     private final UserRepository userRepository;
 
 
-    //SWAP
-    private void swap(Devices device, Long newUserId, String remark) {
+    private Users resolveUser(String value) {
+        return userRepository.findByEmployeeCode(value)
+                .or(() -> userRepository.findByDomainId(value))
+                .orElseThrow(() ->
+                        new RuntimeException("User not found: " + value));
+    }
+
+    // =====================================================
+    // CORE OPERATIONS
+    // =====================================================
+
+    private void swap(Devices device, Users newUser, String remark) {
 
         DeviceAssignment current =
                 assignmentRepository
                         .findByDevices_IdAndDeallocatedOnIsNull(device.getId())
-                        .orElseThrow(() -> new RuntimeException("No active assignment"));
-
-        Users newUser = userRepository.findById(newUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                        .orElseThrow(() ->
+                                new RuntimeException("No active assignment found"));
 
         current.setDeallocatedOn(LocalDateTime.now());
+        assignmentRepository.save(current);
 
         DeviceAssignment next = new DeviceAssignment();
         next.setDevices(device);
@@ -59,15 +68,16 @@ public class DeviceServiceImpl implements DeviceService {
         DeviceAssignment current =
                 assignmentRepository
                         .findByDevices_IdAndDeallocatedOnIsNull(device.getId())
-                        .orElseThrow(() -> new RuntimeException("Device not active"));
+                        .orElseThrow(() ->
+                                new RuntimeException("Device not active"));
 
         current.setDeallocatedOn(LocalDateTime.now());
+        assignmentRepository.save(current);
+
         device.setStatus(Status.PULLED);
     }
 
-    private void assign(Devices device, Long userId, String remark) {
-        Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    private void assign(Devices device, Users user, String remark) {
 
         DeviceAssignment assignment = new DeviceAssignment();
         assignment.setDevices(device);
@@ -80,54 +90,42 @@ public class DeviceServiceImpl implements DeviceService {
         device.setStatus(Status.ACTIVE);
     }
 
-
-
+    // =====================================================
+    // SWAP / ASSIGN / PULL API
+    // =====================================================
     @Override
     @Transactional
     public void swapDevice(DeviceSwapDto request) {
 
-        Devices devices = deviceRepository
+        Devices device = deviceRepository
                 .findBySerialNoIgnoreCase(request.getSerialNo().trim())
-                .orElseThrow(() -> new RuntimeException("Device Not Found"+request.getSerialNo()));
+                .orElseThrow(() ->
+                        new RuntimeException("Device not found: " + request.getSerialNo()));
 
-        Status currentStatus = devices.getStatus();
-        Long userId = request.getToUserId();
+        Status status = device.getStatus();
+        String assignTo = request.getToUserId();
 
-        if (currentStatus == Status.ACTIVE && userId != null) {
-            swap(devices, userId, request.getRemark());
+        // ACTIVE → ACTIVE
+        if (status == Status.ACTIVE && assignTo != null) {
+            Users newUser = resolveUser(assignTo);
+            swap(device, newUser, request.getRemark());
             return;
         }
 
-        if (currentStatus == Status.ACTIVE && userId == null) {
-            pull(devices, request.getRemark());
+        // ACTIVE → PULLED
+        if (status == Status.ACTIVE && assignTo == null) {
+            pull(device, request.getRemark());
             return;
         }
 
-        if (currentStatus == Status.PULLED && userId != null) {
-            assign(devices, userId, request.getRemark());
+        // PULLED → ACTIVE
+        if (status == Status.PULLED && assignTo != null) {
+            Users user = resolveUser(assignTo);
+            assign(device, user, request.getRemark());
             return;
         }
-
-        DeviceAssignment currentAssignment = assignmentRepository.findByDevices_IdAndDeallocatedOnIsNull(devices.getId())
-                .orElseThrow(() -> new RuntimeException("Device not currently assigned"));
-
-        Users newUser = userRepository.findById(request.getToUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        currentAssignment.setDeallocatedOn(LocalDateTime.now());
-
-        DeviceAssignment newAssignment = new DeviceAssignment();
-        newAssignment.setDevices(devices);
-        newAssignment.setUsers(newUser);
-        newAssignment.setAllocatedOn(LocalDateTime.now());
-        newAssignment.setUsedBy(request.getRemark());
-
-        assignmentRepository.save(newAssignment);
-
-        devices.setStatus(Status.ACTIVE);
+        throw new RuntimeException("Invalid device state transition");
     }
-
-
     //HISTORY
     public DeviceHistoryResponse getDeviceHistory(String value) {
 

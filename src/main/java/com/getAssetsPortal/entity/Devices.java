@@ -77,4 +77,8 @@ public class Devices {
     private String assetCso;
 
     private String modelName;
+
+    private String assetCertification;
+
+    private String remark;
 }

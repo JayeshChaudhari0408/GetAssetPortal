@@ -38,24 +38,21 @@ public class UserServiceImpl implements UserService {
                     dto.setDomainId(user.getDomainId());
                     dto.setEmployeeCode(user.getEmployeeCode());
 
-                    dto.setRemark(a.getUsedBy());
+                    dto.setRemark(d.getRemark());
 
                     dto.setAssignedDate(a.getAllocatedOn());
-                    dto.setAssignedBy("IT ADMIN"); // or future field
+                    dto.setAssignedBy(a.getUsedBy()); // or future field
 
                     dto.setAssetControlledBy(d.getAssetControlledBy());
-
                     dto.setDeviceType(d.getDeviceType());
                     dto.setDeviceSubType(d.getDeviceSubType());
 
                     dto.setBrand(d.getBrand());
                     dto.setModel(d.getModelName());
-
                     dto.setSerialNumber(d.getSerialNo());
                     dto.setHostName(d.getHostName());
 
                     dto.setAssignedTo(user.getEmployeeCode());
-
                     dto.setUsedBy(a.getUsedBy());
 
                     dto.setImei(d.getImei());
@@ -63,7 +60,7 @@ public class UserServiceImpl implements UserService {
 
                     dto.setInstalledDate(d.getInstallDate());
 
-                    dto.setAssetCertification(null);   // not in DB
+                    dto.setAssetCertification(d.getAssetCertification());
                     dto.setFilesUploaded(null);        // not in DB
                     return dto;
                 })

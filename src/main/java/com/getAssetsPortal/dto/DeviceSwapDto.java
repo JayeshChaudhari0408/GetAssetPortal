@@ -15,7 +15,7 @@ public class DeviceSwapDto {
     @NotNull
     private String serialNo;
 
-    private Long toUserId;
+    private String toUserId;
 
     private String remark;
 }
