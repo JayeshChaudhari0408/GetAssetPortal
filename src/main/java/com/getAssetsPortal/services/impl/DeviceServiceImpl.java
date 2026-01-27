@@ -130,8 +130,6 @@ public class DeviceServiceImpl implements DeviceService {
             }
         }
 
-
-
         // ACTIVE → ACTIVE
         if (status == Status.ACTIVE && assignTo != null) {
             Users newUser = resolveUser(assignTo);
