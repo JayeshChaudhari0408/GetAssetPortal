@@ -1,6 +1,7 @@
 package com.getAssetsPortal.controller;
 
 import com.getAssetsPortal.dto.UserAssetResponseDto;
+import com.getAssetsPortal.dto.UserAssetRowDto;
 import com.getAssetsPortal.services.UserService;
 import com.getAssetsPortal.services.export.ExportService;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +25,14 @@ public class UserController {
     @GetMapping("/user-assets")
     public ResponseEntity<UserAssetResponseDto> getUserAssets(
             @RequestParam String value) {
-
-        return ResponseEntity.ok(userService.getAssetsByUser(value));
+        return ResponseEntity.ok(userService.getUserAssets(value));
     }
 
     @GetMapping("/user-assets/export")
     public ResponseEntity<byte[]> exportUserAssets(
             @RequestParam String value) {
-        List<UserAssetResponseDto> assets = Collections.singletonList(userService.getAssetsByUser(value));
+        UserAssetResponseDto assetResponse = userService.getUserAssets(value);
+        List<UserAssetRowDto> assets = assetResponse.getUserAssetRowDto();
         byte[] file = exportService.exportUserAssets(assets);
         return ResponseEntity.ok()
                 .header("Content-Disposition",

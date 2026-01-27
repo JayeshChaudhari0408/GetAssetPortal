@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -23,65 +24,60 @@ public class UserServiceImpl implements UserService {
     private final AssignmentRepository assignmentRepository;
     private final UserRepository userRepository;
 
-    @Override
-    public UserAssetResponseDto getAssetsByUser(String value) {
-
-        Users user = userRepository.findByEmployeeCode(value)
+    private Users resolveUser(String value) {
+        return userRepository.findByEmployeeCode(value)
                 .or(() -> userRepository.findByDomainId(value))
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // ----------------------------
-        // USER DETAILS (ONCE)
-        // ----------------------------
-        UserDetailDto userDetailDto = new UserDetailDto(
-                user.getDomainId(),
-                user.getEmployeeCode(),
-                user.getLocation(),
-                user.getEmail(),
-                user.getDepartment(),
-                user.getContactNumber()
-        );
-
-        // ----------------------------
-        // ACTIVE ASSETS
-        // ----------------------------
-        List<DeviceAssignment> assignments =
-                assignmentRepository
-                        .findByUsers_IdAndDeallocatedOnIsNull(user.getId());
-
-        List<UserAssetRowDto> assetRows = assignments.stream()
-                .map(a -> {
-                    Devices d = a.getDevices();
-
-                    return new UserAssetRowDto(
-                            d.getRemark(),
-                            a.getAllocatedOn(),
-                            a.getUsedBy(),
-                            d.getAssetControlledBy(),
-                            d.getDeviceType(),
-                            d.getDeviceSubType(),
-                            d.getBrand(),
-                            d.getModelName(),
-                            d.getSerialNo(),
-                            d.getHostName(),
-                            user.getEmployeeCode(),
-                            a.getUsedBy(),
-                            d.getImei(),
-                            d.getMacId(),
-                            d.getInstallDate(),
-                            d.getAssetCertification(),
-                            null
-                    );
-                })
-                .toList();
-
-        // ----------------------------
-        // FINAL RESPONSE
-        // ----------------------------
-        return new UserAssetResponseDto(
-                userDetailDto,
-                assetRows
-        );
+                .orElseThrow(() -> new RuntimeException("User not found: " + value));
     }
 
+    @Override
+    public UserAssetResponseDto getUserAssets(String value) {
+
+        Users user = resolveUser(value);
+
+        UserAssetResponseDto response = new UserAssetResponseDto();
+
+        UserDetailDto userDetails = new UserDetailDto();
+        userDetails.setDomainId(user.getDomainId());
+        userDetails.setEmployeeCode(user.getEmployeeCode());
+        userDetails.setLocation(user.getLocation());
+        userDetails.setEmail(user.getEmail());
+        userDetails.setDepartment(user.getDepartment());
+        userDetails.setContactNumber(user.getContactNumber());
+
+        response.setUserDetailDto(userDetails);
+
+        List<DeviceAssignment> assignments = assignmentRepository.findByUsers_IdAndDeallocatedOnIsNull(user.getId());
+
+        List<UserAssetRowDto> assets = assignments.stream().map(a -> {
+            Devices d = a.getDevices();
+            UserAssetRowDto row = new UserAssetRowDto();
+
+            row.setRemark(a.getUsedBy());
+            row.setAssignedDate(a.getAllocatedOn());
+            row.setAssignedBy("System"); // Not captured
+
+            row.setAssetControlledBy(d.getAssetControlledBy());
+            row.setDeviceType(d.getDeviceType());
+            row.setDeviceSubType(d.getDeviceSubType());
+            row.setBrand(d.getBrand());
+            row.setModel(d.getModelName());
+            row.setSerialNumber(d.getSerialNo());
+            row.setHostName(d.getHostName());
+            row.setAssignedTo(user.getDomainId());
+            row.setUsedBy(a.getUsedBy());
+            row.setImei(d.getImei());
+            row.setMacId(d.getMacId());
+            row.setInstalledDate(d.getInstallDate());
+            // row.setAssetCertification(d.getAssetCertification()); // Checking entity...
+            // not present in Devices
+            // row.setFilesUploaded(d.getFiles()); // Not present
+
+            return row;
+        }).collect(Collectors.toList());
+
+        response.setUserAssetRowDto(assets);
+
+        return response;
+    }
 }

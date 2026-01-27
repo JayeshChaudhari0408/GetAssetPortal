@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface UserService {
 
-    UserAssetResponseDto  getAssetsByUser(String value);
+    UserAssetResponseDto  getUserAssets(String value);
 }

@@ -39,14 +39,11 @@ public class DeviceController {
     @GetMapping("/history/export")
     public ResponseEntity<byte[]> exportDeviceHistory(
             @RequestParam String value) {
-        DeviceHistoryResponse response =
-                deviceService.getDeviceHistory(value);
+        DeviceHistoryResponse response = deviceService.getDeviceHistory(value);
         byte[] file = exportService.exportDeviceHistory(response);
         return ResponseEntity.ok()
                 .header("Content-Disposition",
                         "attachment; filename=device-history.xlsx")
                 .body(file);
     }
-
-
 }

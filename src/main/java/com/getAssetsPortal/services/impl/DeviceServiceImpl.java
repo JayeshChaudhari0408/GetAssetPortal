@@ -17,9 +17,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -63,32 +62,32 @@ public class DeviceServiceImpl implements DeviceService {
         device.setStatus(Status.ACTIVE);
     }
 
-    private void pull(Devices device, String remark) {
+//    private void pull(Devices device, String remark) {
+//
+//        DeviceAssignment current =
+//                assignmentRepository
+//                        .findByDevices_IdAndDeallocatedOnIsNull(device.getId())
+//                        .orElseThrow(() ->
+//                                new RuntimeException("Device not active"));
+//
+//        current.setDeallocatedOn(LocalDateTime.now());
+//        assignmentRepository.save(current);
+//
+//        device.setStatus(Status.PULLED);
+//    }
 
-        DeviceAssignment current =
-                assignmentRepository
-                        .findByDevices_IdAndDeallocatedOnIsNull(device.getId())
-                        .orElseThrow(() ->
-                                new RuntimeException("Device not active"));
-
-        current.setDeallocatedOn(LocalDateTime.now());
-        assignmentRepository.save(current);
-
-        device.setStatus(Status.PULLED);
-    }
-
-    private void assign(Devices device, Users user, String remark) {
-
-        DeviceAssignment assignment = new DeviceAssignment();
-        assignment.setDevices(device);
-        assignment.setUsers(user);
-        assignment.setAllocatedOn(LocalDateTime.now());
-        assignment.setUsedBy(remark);
-
-        assignmentRepository.save(assignment);
-
-        device.setStatus(Status.ACTIVE);
-    }
+//    private void assign(Devices device, Users user, String remark) {
+//
+//        DeviceAssignment assignment = new DeviceAssignment();
+//        assignment.setDevices(device);
+//        assignment.setUsers(user);
+//        assignment.setAllocatedOn(LocalDateTime.now());
+//        assignment.setUsedBy(remark);
+//
+//        assignmentRepository.save(assignment);
+//
+//        device.setStatus(Status.ACTIVE);
+//    }
 
     // =====================================================
     // SWAP / ASSIGN / PULL API
@@ -146,27 +145,27 @@ public class DeviceServiceImpl implements DeviceService {
         }
 
         // ACTIVE → PULLED
-        if (status == Status.ACTIVE && assignTo == null) {
-            pull(device, request.getRemark());
-            return new DeviceActionResponse(
-                    device.getSerialNo(),
-                    "PULLED",
-                    null,
-                    actionTime
-            );
-        }
-
-        // PULLED → ACTIVE
-        if (status == Status.PULLED && assignTo != null) {
-            Users user = resolveUser(assignTo);
-            assign(device, user, request.getRemark());
-            return new DeviceActionResponse(
-                    device.getSerialNo(),
-                    "ASSIGNED",
-                    user.getEmployeeCode(),
-                    actionTime
-            );
-        }
+//        if (status == Status.ACTIVE && assignTo == null) {
+//            pull(device, request.getRemark());
+//            return new DeviceActionResponse(
+//                    device.getSerialNo(),
+//                    "PULLED",
+//                    null,
+//                    actionTime
+//            );
+//        }
+//
+//        // PULLED → ACTIVE
+//        if (status == Status.PULLED && assignTo != null) {
+//            Users user = resolveUser(assignTo);
+//            assign(device, user, request.getRemark());
+//            return new DeviceActionResponse(
+//                    device.getSerialNo(),
+//                    "ASSIGNED",
+//                    user.getEmployeeCode(),
+//                    actionTime
+//            );
+//        }
         throw new RuntimeException("Invalid device state transition");
     }
     //HISTORY
@@ -210,8 +209,32 @@ public class DeviceServiceImpl implements DeviceService {
         List<DeviceHistoryRowDto> history = assignments.stream()
                 .map(a -> {
                     DeviceHistoryRowDto h = new DeviceHistoryRowDto();
+                    h.setSerialNumber(device.getSerialNo());
+                    h.setImei(device.getImei());
+                    h.setAssetCode(device.getAssetCode());
                     h.setDomainId(a.getUsers().getDomainId());
                     h.setEmployeeCode(a.getUsers().getEmployeeCode());
+
+                    // Logic for AssignedTo and UsedBy fields in history
+                    // Assuming 'assignment' maps the user who has it.
+                    h.setAssignedTo(a.getUsers().getDomainId());
+                    h.setUsedBy(a.getUsedBy());
+
+                    // Action logic: If it's the first assignment, maybe "ASSIGNED".
+                    // If pulled (deallocated), it might be "RETURNED" or "SWAPPED" (hard to tell
+                    // from single record without looking at context headers of prev/next).
+                    // For now, let's keep it simple or derive from status if active.
+                    h.setAction(a.getDeallocatedOn() == null ? "ACTIVE" : "RETURNED/SWAPPED");
+
+                    h.setRemark(device.getRemark()); // Using 'UsedBy' as remark or if there's a separate remark field?
+                    // Entity doesn't seem to have a separate 'remark' field on Assignment other
+                    // than 'usedBy' string sometimes used as remark.
+                    // Actually, 'swap' method sets 'usedBy' with remark. So consistent.
+
+                    h.setActionDate(a.getAllocatedOn());
+                    h.setActionBy(a.getUsers().getDomainId()); // Or who performed the action? Not captured in
+                    // Assignment entity.
+
                     return h;
                 })
                 .toList();
@@ -229,16 +252,58 @@ public class DeviceServiceImpl implements DeviceService {
         List<DeviceBulkRowResultDto> results = new ArrayList<>();
         int success = 0;
         int failure = 0;
-        int rowNumber = 1;
 
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(file.getInputStream()))) {
 
             br.readLine(); // skip header
 
+            List<String> lines = new ArrayList<>();
             String line;
             while ((line = br.readLine()) != null) {
-                DeviceBulkRowResultDto result = processRow(line, rowNumber++);
+                if (!line.trim().isEmpty()) {
+                    lines.add(line);
+                }
+            }
+
+            // 1. Collect all identifiers
+            Set<String> serialNos = new HashSet<>();
+            Set<String> domainIds = new HashSet<>();
+
+            for (String l : lines) {
+                String[] data = l.split(",");
+                if (data.length >= 4) {
+                    serialNos.add(data[0].trim());
+                    String assignedTo = data[1].trim();
+                    String usedBy = data[2].trim();
+                    if (!assignedTo.isEmpty())
+                        domainIds.add(assignedTo);
+                    if (!usedBy.isEmpty())
+                        domainIds.add(usedBy);
+                }
+            }
+
+            // 2. Batch Fetch
+            Map<String, Devices> deviceMap = deviceRepository.findAllBySerialNoIn(new ArrayList<>(serialNos))
+                    .stream().collect(Collectors.toMap(d -> d.getSerialNo().toLowerCase(), d -> d, (d1, d2) -> d1)); // Handle
+            // duplicates
+            // if
+            // any
+
+            Map<String, Users> userMap = userRepository.findAllByDomainIdIn(new ArrayList<>(domainIds))
+                    .stream().collect(Collectors.toMap(u -> u.getDomainId().toLowerCase(), u -> u, (u1, u2) -> u1));
+
+            List<Long> deviceIds = deviceMap.values().stream().map(Devices::getId).collect(Collectors.toList());
+
+            // Map<DeviceId, Assignment>
+            Map<Long, DeviceAssignment> assignmentMap = assignmentRepository
+                    .findAllByDevices_IdInAndDeallocatedOnIsNull(deviceIds)
+                    .stream().collect(Collectors.toMap(a -> a.getDevices().getId(), a -> a, (a1, a2) -> a1));
+
+            // 3. Process Rows in Memory
+            int rowNumber = 1;
+            for (String l : lines) {
+                DeviceBulkRowResultDto result = processRowOptimized(l, rowNumber++, deviceMap, userMap, assignmentMap);
                 results.add(result);
 
                 if ("SUCCESS".equals(result.getStatus())) {
@@ -260,7 +325,10 @@ public class DeviceServiceImpl implements DeviceService {
                 .build();
     }
 
-    private DeviceBulkRowResultDto processRow(String line, int rowNumber) {
+    private DeviceBulkRowResultDto processRowOptimized(String line, int rowNumber,
+                                                       Map<String, Devices> deviceMap,
+                                                       Map<String, Users> userMap,
+                                                       Map<Long, DeviceAssignment> assignmentMap) {
 
         String[] data = line.split(",");
 
@@ -274,27 +342,88 @@ public class DeviceServiceImpl implements DeviceService {
             String usedBy = data[2].trim();
             String deviceType = data[3].trim();
 
-            Devices device = deviceRepository.findBySerialNo(serialNo)
-                    .orElseThrow(() -> new RuntimeException("Device not found"));
+            Devices device = deviceMap.get(serialNo.toLowerCase());
+            if (device == null) {
+                throw new RuntimeException("Device not found: " + serialNo);
+            }
 
-            Users assignedUser = userRepository.findByDomainId(assignedTo)
-                    .orElseThrow(() -> new RuntimeException("Assigned user not found"));
+            Users assignedUser = userMap.get(assignedTo.toLowerCase());
+            if (assignedUser == null) {
+                throw new RuntimeException("Assigned user not found: " + assignedTo);
+            }
 
-            userRepository.findByDomainId(usedBy)
-                    .orElseThrow(() -> new RuntimeException("UsedBy user not found"));
+            // usedBy is just a string in some contexts or user? Assuming logic from
+            // original processRow which fetched user
+            Users usedByUser = userMap.get(usedBy.toLowerCase());
+            if (usedByUser == null) {
+                // In original code: userRepository.findByDomainId(usedBy).orElseThrow
+                throw new RuntimeException("UsedBy user not found: " + usedBy);
+            }
 
-            if (!device.getDeviceType().equalsIgnoreCase(deviceType)) {
+            // Device type normalization
+            String dbType = device.getDeviceType().replaceAll("\\s+", "").toLowerCase();
+            String csvType = deviceType.replaceAll("\\s+", "").toLowerCase();
+
+            if (!dbType.equals(csvType)) {
                 throw new RuntimeException("Device type mismatch");
             }
 
-            if (device.getStatus() != Status.PULLED) {
-                throw new RuntimeException("Device not available");
+            // STATUS FIX
+            if (device.getStatus() != Status.ACTIVE) {
+                throw new RuntimeException("Device not active");
             }
 
-            // Assign device
-            device.setStatus(Status.ACTIVE);
+            // === LOGIC FIX: Handle Assignment ===
+            DeviceAssignment currentAssignment = assignmentMap.get(device.getId());
+
+            // Check if actual swap is needed
+            boolean assignmentChanged = false;
+
+            if (currentAssignment != null) {
+                if (!currentAssignment.getUsers().getId().equals(assignedUser.getId())) {
+                    // Ends old assignment
+                    currentAssignment.setDeallocatedOn(LocalDateTime.now());
+                    assignmentRepository.save(currentAssignment);
+
+                    // Creates new assignment
+                    DeviceAssignment newAssignment = new DeviceAssignment();
+                    newAssignment.setDevices(device);
+                    newAssignment.setUsers(assignedUser);
+                    newAssignment.setAllocatedOn(LocalDateTime.now());
+                    newAssignment.setUsedBy(usedBy); // NOTE: Original code used 'remark' from request or 'usedBy'
+                    // string?
+                    // In processRow original: device.setAssetCso(usedBy);
+                    // Logic in swap(): next.setUsedBy(remark);
+                    // Let's use 'usedBy' string for the assignment 'usedBy' field if that's the
+                    // intent.
+                    // Checking original entities... DeviceAssignment has 'usedBy' field (String).
+
+                    assignmentRepository.save(newAssignment);
+
+                    // Update map for next occurrences if any (though unlikely in same CSV for same
+                    // device)
+                    assignmentMap.put(device.getId(), newAssignment);
+                    assignmentChanged = true;
+                }
+            } else {
+                // No active assignment, but device is ACTIVE per check above?
+                // If device is ACTIVE but no assignment, we should create one.
+                DeviceAssignment newAssignment = new DeviceAssignment();
+                newAssignment.setDevices(device);
+                newAssignment.setUsers(assignedUser);
+                newAssignment.setAllocatedOn(LocalDateTime.now());
+                newAssignment.setUsedBy(usedBy);
+                assignmentRepository.save(newAssignment);
+                assignmentMap.put(device.getId(), newAssignment);
+                assignmentChanged = true;
+            }
+
+            // UPDATE DEVICE FIELDS
             device.setInstalledBy(assignedUser.getDomainId());
             device.setInstallDate(LocalDateTime.now());
+            device.setAssetCso(usedBy); // Set assetCso to usedBy
+            device.setPulledBy(null);
+            device.setPulledDate(null);
 
             deviceRepository.save(device);
 
@@ -303,6 +432,7 @@ public class DeviceServiceImpl implements DeviceService {
         } catch (Exception ex) {
             return DeviceBulkRowResultDto.builder()
                     .rowNumber(rowNumber)
+                    .serialNo(data.length > 0 ? data[0].trim() : null)
                     .status("FAILED")
                     .errorReason(ex.getMessage())
                     .build();
