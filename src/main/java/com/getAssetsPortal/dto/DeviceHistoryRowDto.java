@@ -13,11 +13,19 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class DeviceHistoryRowDto {
 
+    private String serialNumber;
+    private String imei;
+    private String assetCode;
+
     private String domainId;
     private String employeeCode;
+    private String assignedTo;
+    private String usedBy;
 
-    private LocalDateTime assignedOn;
-    private LocalDateTime unassignedOn;
-    private String assignedBy;
+    private String action; // ASSIGNED / SWAPPED / RETURNED
+    private String remark;
+
+    private LocalDateTime actionDate;
+    private String actionBy;
 }
 

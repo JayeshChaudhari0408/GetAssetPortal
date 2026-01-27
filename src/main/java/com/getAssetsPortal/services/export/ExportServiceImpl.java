@@ -2,13 +2,15 @@ package com.getAssetsPortal.services.export;
 
 import com.getAssetsPortal.dto.DeviceHistoryResponse;
 import com.getAssetsPortal.dto.DeviceHistoryRowDto;
-import com.getAssetsPortal.dto.UserAssetDto;
+import com.getAssetsPortal.dto.UserAssetResponseDto;
+import com.getAssetsPortal.dto.UserDetailDto;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -16,81 +18,61 @@ import java.util.List;
 public class ExportServiceImpl implements ExportService {
 
     @Override
-    public byte[] exportUserAssets(List<UserAssetDto> assets) {
-
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("User Assets");
-
-            Row header = sheet.createRow(0);
-            String[] columns = {
-                    "Domain ID", "Employee Code", "Device Type", "Sub Type",
-                    "Brand", "Model", "Serial No", "Host Name",
-                    "Assigned Date", "Assigned By", "Status"
-            };
-
-            for (int i = 0; i < columns.length; i++) {
-                header.createCell(i).setCellValue(columns[i]);
-            }
-
-            int rowIdx = 1;
-            for (UserAssetDto dto : assets) {
-                Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(dto.getDomainId());
-                row.createCell(1).setCellValue(dto.getEmployeeCode());
-                row.createCell(2).setCellValue(dto.getDeviceType());
-                row.createCell(3).setCellValue(dto.getDeviceSubType());
-                row.createCell(4).setCellValue(dto.getBrand());
-                row.createCell(5).setCellValue(dto.getModel());
-                row.createCell(6).setCellValue(dto.getSerialNumber());
-                row.createCell(7).setCellValue(dto.getHostName());
-                row.createCell(8).setCellValue(
-                        dto.getAssignedDate() != null ? dto.getAssignedDate().toString() : ""
-                );
-                row.createCell(9).setCellValue(dto.getAssignedBy());
-                row.createCell(10).setCellValue("ACTIVE");
-            }
-
-            for (int i = 0; i < columns.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            return out.toByteArray();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to export user assets", e);
-        }
+    public byte[] exportUserAssets(List<UserAssetResponseDto> assets) {
+        return new byte[0];
     }
 
     @Override
     public byte[] exportDeviceHistory(DeviceHistoryResponse response) {
 
         try (Workbook workbook = new XSSFWorkbook()) {
+
             Sheet sheet = workbook.createSheet("Device History");
 
-            Row header = sheet.createRow(0);
             String[] columns = {
-                    "Domain ID", "Employee Code", "Assigned On",
-                    "Unassigned On", "Assigned By"
+                    "Serial No",
+                    "IMEI",
+                    "Asset Code",
+                    "Domain ID",
+                    "Employee Code",
+                    "Assigned To",
+                    "Used By",
+                    "Action",
+                    "Remark",
+                    "Action Date",
+                    "Action By"
             };
 
+            Row header = sheet.createRow(0);
             for (int i = 0; i < columns.length; i++) {
                 header.createCell(i).setCellValue(columns[i]);
             }
 
             int rowIdx = 1;
-            for (DeviceHistoryRowDto dto : response.getHistory()) {
+
+            for (DeviceHistoryRowDto rowDto : response.getHistory()) {
+
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(dto.getDomainId());
-                row.createCell(1).setCellValue(dto.getEmployeeCode());
-                row.createCell(2).setCellValue(
-                        dto.getAssignedOn() != null ? dto.getAssignedOn().toString() : ""
+
+                row.createCell(0).setCellValue(rowDto.getSerialNumber());
+                row.createCell(1).setCellValue(rowDto.getImei());
+                row.createCell(2).setCellValue(rowDto.getAssetCode());
+
+                row.createCell(3).setCellValue(rowDto.getDomainId());
+                row.createCell(4).setCellValue(rowDto.getEmployeeCode());
+                row.createCell(5).setCellValue(rowDto.getAssignedTo());
+                row.createCell(6).setCellValue(rowDto.getUsedBy());
+
+                row.createCell(7).setCellValue(rowDto.getAction());
+                row.createCell(8).setCellValue(rowDto.getRemark());
+
+                row.createCell(9).setCellValue(
+                        rowDto.getActionDate() != null
+                                ? rowDto.getActionDate().toString()
+                                : ""
                 );
-                row.createCell(3).setCellValue(
-                        dto.getUnassignedOn() != null ? dto.getUnassignedOn().toString() : ""
-                );
-                row.createCell(4).setCellValue(dto.getAssignedBy());
+
+                row.createCell(10).setCellValue(rowDto.getActionBy());
             }
 
             for (int i = 0; i < columns.length; i++) {
@@ -105,4 +87,5 @@ public class ExportServiceImpl implements ExportService {
             throw new RuntimeException("Failed to export device history", e);
         }
     }
+
 }

@@ -11,7 +11,6 @@ import com.getAssetsPortal.repositories.UserRepository;
 import com.getAssetsPortal.services.DeviceService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.apache.catalina.User;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -96,7 +95,7 @@ public class DeviceServiceImpl implements DeviceService {
     // =====================================================
     @Override
     @Transactional
-    public void swapDevice(DeviceSwapDto request) {
+    public DeviceActionResponse swapDevice(DeviceSwapDto request) {
 
         Devices device = deviceRepository
                 .findBySerialNoIgnoreCase(request.getSerialNo().trim())
@@ -106,24 +105,67 @@ public class DeviceServiceImpl implements DeviceService {
         Status status = device.getStatus();
         String assignTo = request.getToUserId();
 
+        LocalDateTime actionTime = LocalDateTime.now();
+
+        Users targetUser = assignTo != null ? resolveUser(assignTo) : null;
+
+        if (assignTo != null && assignTo.trim().isEmpty()) {
+            throw new RuntimeException("Assignee cannot be empty");
+        }
+
+        Optional<DeviceAssignment> activeAssignment =
+                assignmentRepository.findByDevices_IdAndDeallocatedOnIsNull(device.getId());
+
+
+        if (activeAssignment.isPresent() && targetUser != null) {
+
+            Users currentUser = activeAssignment.get().getUsers();
+
+            if (currentUser.getId().equals(targetUser.getId())) {
+                return new DeviceActionResponse(
+                        device.getSerialNo(),
+                        "ALREADY_ASSIGNED",
+                        currentUser.getEmployeeCode(),
+                        actionTime
+                );
+            }
+        }
+
+
+
         // ACTIVE → ACTIVE
         if (status == Status.ACTIVE && assignTo != null) {
             Users newUser = resolveUser(assignTo);
             swap(device, newUser, request.getRemark());
-            return;
+            return new DeviceActionResponse(
+                    device.getSerialNo(),
+                    "SWAPPED",
+                    newUser.getEmployeeCode(),
+                    actionTime
+            );
         }
 
         // ACTIVE → PULLED
         if (status == Status.ACTIVE && assignTo == null) {
             pull(device, request.getRemark());
-            return;
+            return new DeviceActionResponse(
+                    device.getSerialNo(),
+                    "PULLED",
+                    null,
+                    actionTime
+            );
         }
 
         // PULLED → ACTIVE
         if (status == Status.PULLED && assignTo != null) {
             Users user = resolveUser(assignTo);
             assign(device, user, request.getRemark());
-            return;
+            return new DeviceActionResponse(
+                    device.getSerialNo(),
+                    "ASSIGNED",
+                    user.getEmployeeCode(),
+                    actionTime
+            );
         }
         throw new RuntimeException("Invalid device state transition");
     }
@@ -170,9 +212,6 @@ public class DeviceServiceImpl implements DeviceService {
                     DeviceHistoryRowDto h = new DeviceHistoryRowDto();
                     h.setDomainId(a.getUsers().getDomainId());
                     h.setEmployeeCode(a.getUsers().getEmployeeCode());
-                    h.setAssignedOn(a.getAllocatedOn());
-                    h.setUnassignedOn(a.getDeallocatedOn());
-                    h.setAssignedBy(a.getUsedBy());
                     return h;
                 })
                 .toList();

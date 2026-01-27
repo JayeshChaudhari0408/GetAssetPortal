@@ -1,5 +1,6 @@
 package com.getAssetsPortal.controller;
 
+import com.getAssetsPortal.dto.DeviceActionResponse;
 import com.getAssetsPortal.dto.DeviceBulkSummaryDto;
 import com.getAssetsPortal.dto.DeviceHistoryResponse;
 import com.getAssetsPortal.dto.DeviceSwapDto;
@@ -19,34 +20,28 @@ public class DeviceController {
     private final ExportService exportService;
 
     @PutMapping("/swap")
-    public ResponseEntity<String> swapDevice(@RequestBody DeviceSwapDto request) {
-        deviceService.swapDevice(request);
-        return ResponseEntity.ok("Assets swapped successfully");
+    public ResponseEntity<DeviceActionResponse> swapDevice(@RequestBody DeviceSwapDto request) {
+        return ResponseEntity.ok(deviceService.swapDevice(request));
     }
 
     @GetMapping("/history")
     public ResponseEntity<DeviceHistoryResponse> history(
             @RequestParam String value) {
-
         return ResponseEntity.ok(deviceService.getDeviceHistory(value));
     }
 
     @PostMapping(value = "/bulk", consumes = "multipart/form-data")
     public ResponseEntity<DeviceBulkSummaryDto> bulkUpload(
             @RequestParam("file") MultipartFile file) {
-
         return ResponseEntity.ok(deviceService.processCSV(file));
     }
 
     @GetMapping("/history/export")
     public ResponseEntity<byte[]> exportDeviceHistory(
             @RequestParam String value) {
-
         DeviceHistoryResponse response =
                 deviceService.getDeviceHistory(value);
-
         byte[] file = exportService.exportDeviceHistory(response);
-
         return ResponseEntity.ok()
                 .header("Content-Disposition",
                         "attachment; filename=device-history.xlsx")

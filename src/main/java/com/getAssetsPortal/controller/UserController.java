@@ -1,6 +1,6 @@
 package com.getAssetsPortal.controller;
 
-import com.getAssetsPortal.dto.UserAssetDto;
+import com.getAssetsPortal.dto.UserAssetResponseDto;
 import com.getAssetsPortal.services.UserService;
 import com.getAssetsPortal.services.export.ExportService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -21,7 +22,7 @@ public class UserController {
     private final ExportService exportService;
 
     @GetMapping("/user-assets")
-    public ResponseEntity<List<UserAssetDto>> getUserAssets(
+    public ResponseEntity<UserAssetResponseDto> getUserAssets(
             @RequestParam String value) {
 
         return ResponseEntity.ok(userService.getAssetsByUser(value));
@@ -30,15 +31,11 @@ public class UserController {
     @GetMapping("/user-assets/export")
     public ResponseEntity<byte[]> exportUserAssets(
             @RequestParam String value) {
-
-        List<UserAssetDto> assets = userService.getAssetsByUser(value);
+        List<UserAssetResponseDto> assets = Collections.singletonList(userService.getAssetsByUser(value));
         byte[] file = exportService.exportUserAssets(assets);
-
         return ResponseEntity.ok()
                 .header("Content-Disposition",
                         "attachment; filename=user-assets.xlsx")
                 .body(file);
     }
-
-
 }

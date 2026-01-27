@@ -12,10 +12,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserAssetDto {
-
-    private String domainId;
-    private String employeeCode;
+public class UserAssetRowDto {
 
     private String remark;
 
